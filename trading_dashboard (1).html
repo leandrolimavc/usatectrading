@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>USATEC Trading Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#080c14; --surface:#0d1520; --surface2:#111d2e; --border:#1a2a40;
+    --green:#00e5a0; --green-dim:#00e5a018; --red:#ff4060; --red-dim:#ff406018;
+    --gold:#f5c842; --text:#e8f0fe; --muted:#5a7a9a;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:'Space Mono',monospace;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,160,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,160,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+  .wrapper{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:32px 24px 80px;}
+  header{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:40px;gap:16px;flex-wrap:wrap;}
+  .logo-tag{font-size:11px;color:var(--green);letter-spacing:4px;text-transform:uppercase;display:block;margin-bottom:4px;}
+  .logo-title{font-family:'Syne',sans-serif;font-size:clamp(28px,5vw,46px);font-weight:800;line-height:1;letter-spacing:-1px;}
+  .logo-title span{color:var(--green);}
+  .header-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
+  #last-update{font-size:11px;color:var(--muted);}
+  #status-badge{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);font-size:11px;letter-spacing:1px;}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);}
+  .dot.live{background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .refresh-btn{background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'Space Mono',monospace;font-size:11px;padding:6px 14px;border-radius:4px;cursor:pointer;transition:all .2s;}
+  .refresh-btn:hover{border-color:var(--green);color:var(--green);}
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin-bottom:28px;}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px 18px;position:relative;overflow:hidden;transition:border-color .2s,transform .2s;}
+  .kpi:hover{border-color:var(--green);transform:translateY(-2px);}
+  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--border);transition:background .2s;}
+  .kpi:hover::before{background:var(--green);}
+  .kpi.positive::before{background:var(--green);}
+  .kpi.negative::before{background:var(--red);}
+  .kpi-label{font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;}
+  .kpi-value{font-family:'Syne',sans-serif;font-size:clamp(18px,2.5vw,26px);font-weight:800;color:var(--text);line-height:1;}
+  .kpi-value.green{color:var(--green);}
+  .kpi-value.red{color:var(--red);}
+  .kpi-value.gold{color:var(--gold);}
+  .kpi-sub{font-size:10px;color:var(--muted);margin-top:6px;}
+  .section-title{font-family:'Syne',sans-serif;font-size:12px;font-weight:600;color:var(--muted);letter-spacing:3px;text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:10px;}
+  .section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+  #chart-wrap{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:28px;height:200px;position:relative;}
+  canvas{display:block;}
+  .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:auto;}
+  table{width:100%;border-collapse:collapse;min-width:560px;}
+  thead tr{background:var(--surface2);}
+  thead th{padding:12px 16px;text-align:left;font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border);font-weight:400;}
+  tbody tr{border-bottom:1px solid var(--border);transition:background .15s;}
+  tbody tr:last-child{border-bottom:none;}
+  tbody tr:hover{background:var(--surface2);}
+  tbody td{padding:13px 16px;font-size:13px;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;}
+  .badge.pos{background:var(--green-dim);color:var(--green);}
+  .badge.neg{background:var(--red-dim);color:var(--red);}
+  #loading{text-align:center;padding:80px;color:var(--muted);}
+  .spinner{width:32px;height:32px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  #error-msg{background:var(--red-dim);border:1px solid var(--red);border-radius:8px;padding:16px 20px;color:var(--red);font-size:13px;margin-bottom:20px;display:none;line-height:1.7;}
+  footer{margin-top:48px;text-align:center;font-size:11px;color:var(--muted);letter-spacing:1px;}
+  @media(max-width:600px){.kpi-grid{grid-template-columns:1fr 1fr;}}
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <header>
+    <div class="logo">
+      <span class="logo-tag">▸ live dashboard</span>
+      <h1 class="logo-title">USATEC <span>TRADING</span></h1>
+    </div>
+    <div class="header-right">
+      <span id="last-update">Conectando...</span>
+      <div id="status-badge"><div class="dot" id="status-dot"></div><span id="status-text">AGUARDANDO</span></div>
+      <button class="refresh-btn" onclick="fetchData()">↻ Atualizar agora</button>
+    </div>
+  </header>
+
+  <div id="error-msg"></div>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    <p>Carregando dados da sua planilha...</p>
+  </div>
+
+  <div id="dashboard" style="display:none">
+    <p class="section-title">Resumo da conta</p>
+    <div class="kpi-grid">
+      <div class="kpi" id="kpi-capital">
+        <div class="kpi-label">Capital Atual</div>
+        <div class="kpi-value gold" id="val-capital">—</div>
+        <div class="kpi-sub" id="sub-capital">Inicial: —</div>
+      </div>
+      <div class="kpi" id="kpi-lucro">
+        <div class="kpi-label">Lucro Total</div>
+        <div class="kpi-value" id="val-lucro">—</div>
+        <div class="kpi-sub">desde o início</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Retorno Total</div>
+        <div class="kpi-value" id="val-retorno">—</div>
+        <div class="kpi-sub">sobre capital inicial</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Dias Operados</div>
+        <div class="kpi-value gold" id="val-dias">—</div>
+        <div class="kpi-sub" id="sub-winrate">Win rate: —</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Melhor Dia</div>
+        <div class="kpi-value green" id="val-best">—</div>
+        <div class="kpi-sub">resultado máximo</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Pior Dia</div>
+        <div class="kpi-value red" id="val-worst">—</div>
+        <div class="kpi-sub">resultado mínimo</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Média Diária</div>
+        <div class="kpi-value" id="val-media">—</div>
+        <div class="kpi-sub">por dia operado</div>
+      </div>
+    </div>
+
+    <p class="section-title">Evolução do capital</p>
+    <div id="chart-wrap"><canvas id="chart"></canvas></div>
+
+    <p class="section-title">Histórico de operações</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Data</th><th>Saldo Inicial</th><th>Saldo Final</th>
+            <th>Resultado</th><th>Retorno %</th><th>Capital Acum.</th><th>Observações</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>USATEC TRADING · Sincronizado com Google Sheets · Atualização automática a cada 30s</footer>
+</div>
+
+<script>
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQYJhEpKcB0GrXPtwrLmhYCKJD6b3M-n34-czeRR75cv0PUBDAiVzFcBkghG_dgqlzeBah-EjgvV6vF/pub?gid=1541987820&single=true&output=csv';
+
+window.onload = fetchData;
+setInterval(fetchData, 30000);
+
+function setStatus(state, text) {
+  document.getElementById('status-dot').className = 'dot' + (state === 'live' ? ' live' : '');
+  document.getElementById('status-text').textContent = text;
+}
+
+function fmtUSD(v) {
+  if (v === null || v === undefined || isNaN(v)) return '—';
+  return (v < 0 ? '-' : '') + '$' + Math.abs(v).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+function fmtPct(v) {
+  if (v === null || isNaN(v)) return '—';
+  return (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%';
+}
+function parseNum(s) {
+  if (!s && s !== 0) return NaN;
+  return parseFloat(String(s).replace(/[$%\s]/g,'').replace(',','.'));
+}
+
+function parseCSV(text) {
+  return text.trim().split('\n').slice(1).map(line => {
+    const cols = []; let cur = '', inQ = false;
+    for (const ch of line) {
+      if (ch === '"') inQ = !inQ;
+      else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+      else cur += ch;
+    }
+    cols.push(cur.trim());
+    return cols;
+  }).filter(r => r[0] && r[0].trim() !== '' && r[0].trim() !== 'TOTAIS');
+}
+
+function fetchData() {
+  setStatus('loading', 'ATUALIZANDO...');
+  fetch(CSV_URL)
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+    .then(csv => {
+      const rows = parseCSV(csv);
+      if (!rows.length) throw new Error('Nenhum dado encontrado. Preencha a aba Diário no Google Sheets.');
+      renderDashboard(rows);
+      setStatus('live', 'AO VIVO');
+      document.getElementById('last-update').textContent = 'Atualizado: ' + new Date().toLocaleTimeString('pt-BR');
+      document.getElementById('error-msg').style.display = 'none';
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+    })
+    .catch(err => {
+      setStatus('error', 'ERRO');
+      const el = document.getElementById('error-msg');
+      el.style.display = 'block';
+      el.innerHTML = '⚠ ' + err.message;
+      document.getElementById('loading').style.display = 'none';
+    });
+}
+
+function renderDashboard(rows) {
+  const data = rows.map(r => ({
+    data: r[0]||'', ini: parseNum(r[1]), fin: parseNum(r[2]),
+    result: parseNum(r[3]), retorno: parseNum(r[4]), capital: parseNum(r[5]), obs: r[6]||''
+  })).filter(d => !isNaN(d.ini) && d.ini > 0);
+
+  if (!data.length) return;
+
+  const capIni   = data[0].ini;
+  const capAtual = !isNaN(data[data.length-1].capital) ? data[data.length-1].capital : data[data.length-1].fin;
+  const lucro    = capAtual - capIni;
+  const retorno  = lucro / capIni;
+  const diasOp   = data.length;
+  const diasPos  = data.filter(d => d.result > 0).length;
+  const winRate  = diasPos / diasOp;
+  const best     = Math.max(...data.map(d => d.result));
+  const worst    = Math.min(...data.map(d => d.result));
+  const media    = data.reduce((s,d) => s + d.result, 0) / diasOp;
+
+  const set = (id, val, cls) => {
+    const el = document.getElementById(id);
+    el.textContent = val;
+    if (cls) el.className = 'kpi-value ' + cls;
+  };
+
+  set('val-capital', fmtUSD(capAtual), 'gold');
+  document.getElementById('sub-capital').textContent = 'Inicial: ' + fmtUSD(capIni);
+  set('val-lucro', fmtUSD(lucro), lucro >= 0 ? 'green' : 'red');
+  document.getElementById('kpi-lucro').classList.toggle('positive', lucro > 0);
+  document.getElementById('kpi-lucro').classList.toggle('negative', lucro < 0);
+  set('val-retorno', fmtPct(retorno), retorno >= 0 ? 'green' : 'red');
+  set('val-dias', diasOp, 'gold');
+  document.getElementById('sub-winrate').textContent = 'Win rate: ' + Math.round(winRate*100) + '%';
+  set('val-best',  fmtUSD(best),  'green');
+  set('val-worst', fmtUSD(worst), 'red');
+  set('val-media', fmtUSD(media), media >= 0 ? 'green' : 'red');
+
+  drawChart(data, capIni);
+
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = '';
+  [...data].reverse().forEach(d => {
+    const pos = d.result >= 0;
+    const ret = isNaN(d.retorno) ? d.result/d.ini : d.retorno;
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `<td>${d.data}</td><td>${fmtUSD(d.ini)}</td><td>${fmtUSD(d.fin)}</td>` +
+      `<td><span class="badge ${pos?'pos':'neg'}">${fmtUSD(d.result)}</span></td>` +
+      `<td style="color:${pos?'var(--green)':'var(--red)'}">${fmtPct(ret)}</td>` +
+      `<td style="color:var(--gold)">${fmtUSD(d.capital)}</td>` +
+      `<td style="color:var(--muted);font-size:12px">${d.obs||'—'}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function drawChart(data, capIni) {
+  const canvas = document.getElementById('chart');
+  const wrap   = document.getElementById('chart-wrap');
+  const W = wrap.offsetWidth - 40, H = 160;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  const caps = [capIni, ...data.map(d => !isNaN(d.capital) ? d.capital : d.fin)];
+  const minV = Math.min(...caps) * 0.997, maxV = Math.max(...caps) * 1.003;
+  const isUp = caps[caps.length-1] >= capIni;
+  const px = i => (i/(caps.length-1)) * (W-20) + 10;
+  const py = v => H - 10 - ((v-minV)/(maxV-minV)) * (H-20);
+
+  ctx.strokeStyle = 'rgba(26,42,64,.8)'; ctx.lineWidth = 1;
+  [0,.25,.5,.75,1].forEach(t => {
+    const y = 10 + t*(H-20);
+    ctx.beginPath(); ctx.moveTo(10,y); ctx.lineTo(W-10,y); ctx.stroke();
+    const val = maxV - t*(maxV-minV);
+    ctx.fillStyle = 'rgba(90,122,154,.5)'; ctx.font = '9px Space Mono,monospace';
+    ctx.textAlign = 'left'; ctx.fillText('$'+val.toFixed(0), 12, y-3);
+  });
+
+  const col = isUp ? 'rgba(0,229,160,' : 'rgba(255,64,96,';
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0, col+'0.2)'); grad.addColorStop(1, col+'0)');
+  ctx.beginPath(); ctx.moveTo(px(0),py(caps[0]));
+  caps.forEach((v,i) => { if(i>0) ctx.lineTo(px(i),py(v)); });
+  ctx.lineTo(px(caps.length-1),H); ctx.lineTo(px(0),H); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+
+  ctx.beginPath(); ctx.moveTo(px(0),py(caps[0]));
+  caps.forEach((v,i) => { if(i>0) ctx.lineTo(px(i),py(v)); });
+  ctx.strokeStyle = isUp ? '#00e5a0' : '#ff4060'; ctx.lineWidth = 2; ctx.stroke();
+
+  caps.forEach((v,i) => {
+    ctx.beginPath();
+    ctx.arc(px(i), py(v), (i===0||i===caps.length-1)?4:2.5, 0, Math.PI*2);
+    ctx.fillStyle = isUp ? '#00e5a0' : '#ff4060'; ctx.fill();
+  });
+
+  const lx = px(caps.length-1), ly = py(caps[caps.length-1]);
+  ctx.fillStyle = isUp ? '#00e5a0' : '#ff4060';
+  ctx.font = 'bold 11px Space Mono,monospace'; ctx.textAlign = 'right';
+  ctx.fillText(fmtUSD(caps[caps.length-1]), lx-6, ly-8);
+}
+</script>
+</body>
+</html>
