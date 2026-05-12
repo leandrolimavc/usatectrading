@@ -165,7 +165,10 @@ function fmtPct(v) {
 }
 function parseNum(s) {
   if (!s && s !== 0) return NaN;
-  return parseFloat(String(s).replace(/[$%\s]/g,'').replace(',','.'));
+  let v = String(s).replace(/[$%\s"]/g,"").trim();
+  if (/\d+\.\d{3},\d/.test(v)) { v = v.replace(/\./g,"").replace(",","."); }
+  else if (/\d+,\d+/.test(v)) { v = v.replace(",","."); }
+  return parseFloat(v);
 }
 
 function parseCSV(text) {
@@ -223,9 +226,27 @@ function fetchData() {
 }
 
 function renderDashboard(rows) {
+  // Debug: log first few rows to console
+  console.log('CSV rows recebidas:', rows.length);
+  console.log('Primeiras 3 linhas:', JSON.stringify(rows.slice(0,3)));
+
+  // Try to detect column offset (col A is spacer in this sheet)
+  // Find first row where we can parse a number in col 1 or col 2
+  let offset = 0;
+  for (const r of rows.slice(0,5)) {
+    if (!isNaN(parseNum(r[2])) && parseNum(r[2]) > 0) { offset = 1; break; }
+    if (!isNaN(parseNum(r[1])) && parseNum(r[1]) > 0) { offset = 0; break; }
+  }
+  console.log('Offset detectado:', offset);
+
   const data = rows.map(r => ({
-    data: r[1]||'', ini: parseNum(r[2]), fin: parseNum(r[3]),
-    result: parseNum(r[4]), retorno: parseNum(r[5]), capital: parseNum(r[6]), obs: r[7]||''
+    data:    r[1+offset]||'',
+    ini:     parseNum(r[2+offset]),
+    fin:     parseNum(r[3+offset]),
+    result:  parseNum(r[4+offset]),
+    retorno: parseNum(r[5+offset]),
+    capital: parseNum(r[6+offset]),
+    obs:     r[7+offset]||''
   })).filter(d => !isNaN(d.ini) && d.ini > 0);
 
   if (!data.length) return;
